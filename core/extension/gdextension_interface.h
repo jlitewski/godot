@@ -49,7 +49,7 @@ extern "C" {
 
 /* VARIANT TYPES */
 
-typedef enum {
+typedef enum : uint8_t {
 	GDEXTENSION_VARIANT_TYPE_NIL,
 
 	/*  atomic types */
@@ -101,7 +101,7 @@ typedef enum {
 	GDEXTENSION_VARIANT_TYPE_VARIANT_MAX
 } GDExtensionVariantType;
 
-typedef enum {
+typedef enum : uint8_t {
 	/* comparison */
 	GDEXTENSION_VARIANT_OP_EQUAL,
 	GDEXTENSION_VARIANT_OP_NOT_EQUAL,
@@ -244,14 +244,14 @@ typedef struct {
 	GDExtensionStringNamePtr name;
 	GDExtensionPropertyInfo return_value;
 	uint32_t flags; // Bitfield of `GDExtensionClassMethodFlags`.
-	int32_t id;
+	int32_t id; //XXX: Does this need to be a int32_t?
 
 	/* Arguments: `default_arguments` is an array of size `argument_count`. */
-	uint32_t argument_count;
+	uint32_t argument_count; //XXX: Does this need to be a uint32_t?
 	GDExtensionPropertyInfo *arguments;
 
 	/* Default arguments: `default_arguments` is an array of size `default_argument_count`. */
-	uint32_t default_argument_count;
+	uint32_t default_argument_count; //XXX: Does this need to be a uint32_t?
 	GDExtensionVariantPtr *default_arguments;
 } GDExtensionMethodInfo;
 
@@ -365,7 +365,7 @@ typedef void *GDExtensionClassLibraryPtr;
 
 /* Method */
 
-typedef enum {
+typedef enum : uint8_t {
 	GDEXTENSION_METHOD_FLAG_NORMAL = 1,
 	GDEXTENSION_METHOD_FLAG_EDITOR = 2,
 	GDEXTENSION_METHOD_FLAG_CONST = 4,
@@ -375,7 +375,7 @@ typedef enum {
 	GDEXTENSION_METHOD_FLAGS_DEFAULT = GDEXTENSION_METHOD_FLAG_NORMAL,
 } GDExtensionClassMethodFlags;
 
-typedef enum {
+typedef enum : uint8_t {
 	GDEXTENSION_METHOD_ARGUMENT_METADATA_NONE,
 	GDEXTENSION_METHOD_ARGUMENT_METADATA_INT_IS_INT8,
 	GDEXTENSION_METHOD_ARGUMENT_METADATA_INT_IS_INT16,
@@ -398,7 +398,7 @@ typedef struct {
 	void *method_userdata;
 	GDExtensionClassMethodCall call_func;
 	GDExtensionClassMethodPtrCall ptrcall_func;
-	uint32_t method_flags; // Bitfield of `GDExtensionClassMethodFlags`.
+	uint8_t method_flags; // Bitfield of `GDExtensionClassMethodFlags`.
 
 	/* If `has_return_value` is false, `return_value_info` and `return_value_metadata` are ignored.
 	 *
@@ -424,7 +424,7 @@ typedef struct {
 
 typedef struct {
 	GDExtensionStringNamePtr name;
-	uint32_t method_flags; // Bitfield of `GDExtensionClassMethodFlags`.
+	uint8_t method_flags; // Bitfield of `GDExtensionClassMethodFlags`.
 
 	GDExtensionPropertyInfo return_value;
 	GDExtensionClassMethodArgumentMetadata return_value_metadata;
@@ -683,7 +683,7 @@ typedef struct {
 
 /* INITIALIZATION */
 
-typedef enum {
+typedef enum : uint8_t {
 	GDEXTENSION_INITIALIZATION_CORE,
 	GDEXTENSION_INITIALIZATION_SERVERS,
 	GDEXTENSION_INITIALIZATION_SCENE,
@@ -725,14 +725,14 @@ typedef GDExtensionInterfaceFunctionPtr (*GDExtensionInterfaceGetProcAddress)(co
  *
  * For example:
  *
- *   GDExtensionInterfaceGetGodotVersion get_godot_version = (GDExtensionInterfaceGetGodotVersion)p_get_proc_address("get_godot_version");
+ *   GDExtensionInterfaceGetEngineVersion get_godot_version = (GDExtensionInterfaceGetEngineVersion)p_get_proc_address("get_godot_version");
  *
  * (Note that snippet may cause "cast between incompatible function types" on some compilers, you can
  * silence this by adding an intermediary `void*` cast.)
  *
  * You can then call it like a normal function:
  *
- *   GDExtensionGodotVersion godot_version;
+ *   GDExtensionEngineVersion godot_version;
  *   get_godot_version(&godot_version);
  *   printf("Godot v%d.%d.%d\n", godot_version.major, godot_version.minor, godot_version.patch);
  *
@@ -744,11 +744,11 @@ typedef GDExtensionBool (*GDExtensionInitializationFunction)(GDExtensionInterfac
 /* INTERFACE */
 
 typedef struct {
-	uint32_t major;
-	uint32_t minor;
-	uint32_t patch;
+	uint8_t major;
+	uint8_t minor;
+	uint8_t patch;
 	const char *string;
-} GDExtensionGodotVersion;
+} GDExtensionEngineVersion;
 
 /**
  * @name get_godot_version
@@ -758,7 +758,7 @@ typedef struct {
  *
  * @param r_godot_version A pointer to the structure to write the version information into.
  */
-typedef void (*GDExtensionInterfaceGetGodotVersion)(GDExtensionGodotVersion *r_godot_version);
+typedef void (*GDExtensionInterfaceGetEngineVersion)(GDExtensionEngineVersion *r_godot_version);
 
 /* INTERFACE: Memory */
 

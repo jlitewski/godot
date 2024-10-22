@@ -240,7 +240,7 @@ GDExtensionInterfaceFunctionPtr gdextension_get_proc_address(const char *p_name)
 	return GDExtension::get_interface_function(p_name);
 }
 
-static void gdextension_get_godot_version(GDExtensionGodotVersion *r_godot_version) {
+static void gdextension_get_godot_version(GDExtensionEngineVersion *r_godot_version) {
 	r_godot_version->major = VERSION_MAJOR;
 	r_godot_version->minor = VERSION_MINOR;
 	r_godot_version->patch = VERSION_PATCH;

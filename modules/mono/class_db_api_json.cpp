@@ -53,9 +53,9 @@ void class_db_api_to_json(const String &p_output_file, ClassDB::APIType p_api) {
 		}
 
 		Dictionary class_dict;
-		classes_dict[t->name] = class_dict;
+		classes_dict[t->metadata.get_class_name()] = class_dict;
 
-		class_dict["inherits"] = t->inherits;
+		class_dict["inherits"] = t->inherited_metadata.get_class_name();
 
 		{ //methods
 

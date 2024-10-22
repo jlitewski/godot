@@ -133,6 +133,7 @@ MethodInfo::operator Dictionary() const {
 	return d;
 }
 
+//XXX: Depreciated
 MethodInfo MethodInfo::from_dict(const Dictionary &p_dict) {
 	MethodInfo mi;
 

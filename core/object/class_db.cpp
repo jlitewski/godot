@@ -198,8 +198,8 @@ public:
 		// We need need to make sure that all the things it would have done (even if
 		// done in a different way to support placeholders) will also be done here.
 
-		obj->_extension = ClassDB::get_placeholder_extension(ti->name);
-		obj->_extension_instance = memnew(PlaceholderExtensionInstance(ti->name));
+		obj->_extension = ClassDB::get_placeholder_extension(ti->metadata.get_class_name());
+		obj->_extension_instance = memnew(PlaceholderExtensionInstance(ti->metadata.get_class_name()));
 
 #ifdef TOOLS_ENABLED
 		if (obj->_extension->track_instance) {
@@ -212,7 +212,7 @@ public:
 
 	static GDExtensionObjectPtr placeholder_class_recreate_instance(void *p_class_userdata, GDExtensionObjectPtr p_object) {
 		ClassDB::ClassInfo *ti = (ClassDB::ClassInfo *)p_class_userdata;
-		return memnew(PlaceholderExtensionInstance(ti->name));
+		return memnew(PlaceholderExtensionInstance(ti->metadata.get_class_name()));
 	}
 
 	static void placeholder_class_free_instance(void *p_class_userdata, GDExtensionClassInstancePtr p_instance) {
@@ -297,10 +297,12 @@ StringName ClassDB::get_parent_class_nocheck(const StringName &p_class) {
 	OBJTYPE_RLOCK;
 
 	ClassInfo *ti = classes.getptr(p_class);
+
 	if (!ti) {
 		return StringName();
 	}
-	return ti->inherits;
+
+	return ti->inherited_metadata.get_class_name();
 }
 
 StringName ClassDB::get_compatibility_remapped_class(const StringName &p_class) {
@@ -318,7 +320,7 @@ StringName ClassDB::get_compatibility_remapped_class(const StringName &p_class) 
 StringName ClassDB::_get_parent_class(const StringName &p_class) {
 	ClassInfo *ti = classes.getptr(p_class);
 	ERR_FAIL_NULL_V_MSG(ti, StringName(), "Cannot get class '" + String(p_class) + "'.");
-	return ti->inherits;
+	return ti->inherited_metadata.get_class_name();
 }
 
 StringName ClassDB::get_parent_class(const StringName &p_class) {
@@ -359,8 +361,8 @@ uint32_t ClassDB::get_api_hash(APIType p_api) {
 		if (t->api != p_api || !t->exposed) {
 			continue;
 		}
-		hash = hash_murmur3_one_64(t->name.hash(), hash);
-		hash = hash_murmur3_one_64(t->inherits.hash(), hash);
+		hash = hash_murmur3_one_64(t->metadata.get_class_name().hash(), hash);
+		hash = hash_murmur3_one_64(t->inherited_metadata.get_class_name().hash(), hash);
 
 		{ //methods
 
@@ -526,7 +528,7 @@ Object *ClassDB::_instantiate_internal(const StringName &p_class, bool p_require
 		ObjectGDExtension *extension = ti->gdextension;
 #ifdef TOOLS_ENABLED
 		if (!p_require_real_class && ti->is_runtime && Engine::get_singleton()->is_editor_hint()) {
-			extension = get_placeholder_extension(ti->name);
+			extension = get_placeholder_extension(ti->metadata.get_class_name());
 		}
 #endif
 		return (Object *)extension->create_instance(extension->class_userdata);
@@ -534,9 +536,9 @@ Object *ClassDB::_instantiate_internal(const StringName &p_class, bool p_require
 #ifdef TOOLS_ENABLED
 		if (!p_require_real_class && ti->is_runtime && Engine::get_singleton()->is_editor_hint()) {
 			if (!ti->inherits_ptr || !ti->inherits_ptr->creation_func) {
-				ERR_PRINT(vformat("Cannot make a placeholder instance of runtime class %s because its parent cannot be constructed.", ti->name));
+				ERR_PRINT(vformat("Cannot make a placeholder instance of runtime class %s because its parent cannot be constructed.", ti->metadata.get_class_name()));
 			} else {
-				ObjectGDExtension *extension = get_placeholder_extension(ti->name);
+				ObjectGDExtension *extension = get_placeholder_extension(ti->metadata.get_class_name());
 				return (Object *)extension->create_instance(extension->class_userdata);
 			}
 		}
@@ -599,8 +601,8 @@ ObjectGDExtension *ClassDB::get_placeholder_extension(const StringName &p_class)
 	} else {
 		placeholder_extension->library = nullptr;
 		placeholder_extension->parent = nullptr;
-		placeholder_extension->parent_class_name = ti->inherits;
-		placeholder_extension->class_name = ti->name;
+		placeholder_extension->parent_class_name = ti->inherited_metadata.get_class_name();
+		placeholder_extension->class_name = ti->metadata.get_class_name();
 		placeholder_extension->editor_class = ti->api == API_EDITOR;
 		placeholder_extension->reloadable = false;
 		placeholder_extension->is_virtual = ti->is_virtual;
@@ -698,6 +700,8 @@ bool ClassDB::is_abstract(const StringName &p_class) {
 	return ti->creation_func == nullptr && (!ti->gdextension || ti->gdextension->create_instance == nullptr);
 }
 
+//TODO: Refactor this function to take ClassMetadata objects instead of StringName objects
+//XXX: Should this be handled inside the ClassInfo object instead of here?
 bool ClassDB::is_virtual(const StringName &p_class) {
 	OBJTYPE_RLOCK;
 
@@ -718,26 +722,25 @@ bool ClassDB::is_virtual(const StringName &p_class) {
 	return (!ti->disabled && ti->creation_func != nullptr && !(ti->gdextension && !ti->gdextension->create_instance) && ti->is_virtual);
 }
 
+//TODO: Refactor this function to take ClassMetadata objects instead of StringName objects
+//[ ] Fully support namespaces (packages)
 void ClassDB::_add_class2(const StringName &p_class, const StringName &p_inherits) {
 	OBJTYPE_WLOCK;
+	ERR_FAIL_COND_MSG(classes.has(p_class), "Class '" + String(p_class) + "' already exists.");
 
-	const StringName &name = p_class;
-
-	ERR_FAIL_COND_MSG(classes.has(name), "Class '" + String(p_class) + "' already exists.");
-
-	classes[name] = ClassInfo();
-	ClassInfo &ti = classes[name];
-	ti.name = name;
-	ti.inherits = p_inherits;
+	//Set up this classes ClassInfo
+	ClassInfo ti;
 	ti.api = current_api;
+	ti.metadata.set(p_class);
+	ti.inherits_ptr = nullptr; //Default to no parent
 
-	if (ti.inherits) {
-		ERR_FAIL_COND(!classes.has(ti.inherits)); //it MUST be registered.
-		ti.inherits_ptr = &classes[ti.inherits];
-
-	} else {
-		ti.inherits_ptr = nullptr;
+	if(p_inherits) {
+		ERR_FAIL_COND(!classes.has(p_inherits)); //it MUST be registered.
+		ti.inherited_metadata.set(p_inherits);
+		ti.inherits_ptr = &classes[p_inherits];
 	}
+
+	classes[p_class] = ti;
 }
 
 static MethodInfo info_from_bind(MethodBind *p_method) {
@@ -2100,13 +2103,13 @@ void ClassDB::register_extension_class(ObjectGDExtension *p_extension) {
 
 #ifdef TOOLS_ENABLED
 	// @todo This is a limitation of the current implementation, but it should be possible to remove.
-	ERR_FAIL_COND_MSG(p_extension->is_runtime && parent->gdextension && !parent->is_runtime, "Extension runtime class " + String(p_extension->class_name) + " cannot descend from " + parent->name + " which isn't also a runtime class");
+	ERR_FAIL_COND_MSG(p_extension->is_runtime && parent->gdextension && !parent->is_runtime, "Extension runtime class " + String(p_extension->class_name) + " cannot descend from " + parent->metadata.get_class_name() + " which isn't also a runtime class");
 #endif
 
 	ClassInfo c;
 	c.api = p_extension->editor_class ? API_EDITOR_EXTENSION : API_EXTENSION;
 	c.gdextension = p_extension;
-	c.name = p_extension->class_name;
+	c.metadata.set(p_extension->class_name);
 	c.is_virtual = p_extension->is_virtual;
 	if (!p_extension->is_abstract) {
 		// Find the closest ancestor which is either non-abstract or native (or both).
@@ -2116,10 +2119,10 @@ void ClassDB::register_extension_class(ObjectGDExtension *p_extension) {
 				concrete_ancestor->gdextension != nullptr) {
 			concrete_ancestor = concrete_ancestor->inherits_ptr;
 		}
-		ERR_FAIL_NULL_MSG(concrete_ancestor->creation_func, "Extension class " + String(p_extension->class_name) + " cannot extend native abstract class " + String(concrete_ancestor->name));
+		ERR_FAIL_NULL_MSG(concrete_ancestor->creation_func, "Extension class " + String(p_extension->class_name) + " cannot extend native abstract class " + String(concrete_ancestor->metadata.get_class_name()) + ".");
 		c.creation_func = concrete_ancestor->creation_func;
 	}
-	c.inherits = parent->name;
+	c.inherited_metadata.set(parent->metadata.get_class_name());
 	c.class_ptr = parent->class_ptr;
 	c.inherits_ptr = parent;
 	c.exposed = p_extension->is_exposed;
@@ -2127,7 +2130,7 @@ void ClassDB::register_extension_class(ObjectGDExtension *p_extension) {
 		// The parent classes should be exposed if it has an exposed child class.
 		while (parent && !parent->exposed) {
 			parent->exposed = true;
-			parent = classes.getptr(parent->name);
+			parent = classes.getptr(parent->metadata.get_class_name());
 		}
 	}
 	c.reloadable = p_extension->reloadable;

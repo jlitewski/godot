@@ -38,27 +38,29 @@ VARIANT_BITFIELD_CAST(MethodFlags)
 // some helpers
 
 class MethodBind {
-	int method_id;
-	uint32_t hint_flags = METHOD_FLAGS_DEFAULT;
-	StringName name;
-	StringName instance_class;
-	Vector<Variant> default_arguments;
-	int default_argument_count = 0;
-	int argument_count = 0;
+	int method_id; //XXX: now in MethodInfo (see MethodInfo::id)
+	uint32_t hint_flags = METHOD_FLAGS_DEFAULT; //XXX: now in MethodInfo
+	StringName name; //XXX: now in MethodInfo
+	StringName instance_class; //XXX: now in MethodInfo (See ClassMetadata)
+	Vector<Variant> default_arguments; //XXX: now in MethodInfo
+	int default_argument_count = 0; //XXX: Can be derived from MethodInfo
+	int argument_count = 0; //XXX: Can be derived from MethodInfo
 
-	bool _static = false;
-	bool _const = false;
-	bool _returns = false;
-	bool _returns_raw_obj_ptr = false;
+	//XXX: now in MethodInfo (see MethodInfo::flags)
+	bool _static = false;  //METHOD_FLAG_STATIC
+	bool _const = false;   //METHOD_FLAG_CONST
+    bool _returns = false; //METHOD_FLAG_RETURNS
+
+	bool _returns_raw_obj_ptr = false; //Needed in MethodBind
 
 protected:
-	Variant::Type *argument_types = nullptr;
+	Variant::Type *argument_types = nullptr; //Maybe needed?
 #ifdef DEBUG_METHODS_ENABLED
-	Vector<StringName> arg_names;
+	Vector<StringName> arg_names; //XXX: now in MethodInfo (see MethodInfo::arg_names)
 #endif
-	void _set_const(bool p_const);
-	void _set_static(bool p_static);
-	void _set_returns(bool p_returns);
+	void _set_const(bool p_const); //XXX: No longer needed (set in MethodInfo before binding)
+	void _set_static(bool p_static); //XXX: No longer needed (set in MethodInfo before binding)
+	void _set_returns(bool p_returns); //XXX: No longer needed (set in MethodInfo before binding)
 	virtual Variant::Type _gen_argument_type(int p_arg) const = 0;
 	virtual PropertyInfo _gen_argument_type_info(int p_arg) const = 0;
 	void _generate_argument_types(int p_count);
@@ -70,7 +72,7 @@ public:
 	_FORCE_INLINE_ int get_default_argument_count() const { return default_argument_count; }
 
 	_FORCE_INLINE_ Variant has_default_argument(int p_arg) const {
-		int idx = p_arg - (argument_count - default_arguments.size());
+		const int idx = p_arg - (argument_count - default_arguments.size());
 
 		if (idx < 0 || idx >= default_arguments.size()) {
 			return false;
@@ -80,11 +82,11 @@ public:
 	}
 
 	_FORCE_INLINE_ Variant get_default_argument(int p_arg) const {
-		int idx = p_arg - (argument_count - default_arguments.size());
+		const int idx = p_arg - (argument_count - default_arguments.size());
 
 		if (idx < 0 || idx >= default_arguments.size()) {
-			return Variant();
-		} else {
+            return {};
+        } else {
 			return default_arguments[idx];
 		}
 	}

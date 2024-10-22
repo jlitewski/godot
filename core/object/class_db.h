@@ -79,7 +79,7 @@ MethodDefinition D_METHOD(const char *p_name, const VarArgs... p_args) {
 
 class ClassDB {
 public:
-	enum APIType {
+	enum APIType : uint8_t {
 		API_CORE,
 		API_EDITOR,
 		API_EXTENSION,
@@ -97,10 +97,10 @@ public:
 		Variant::Type type;
 	};
 
-	struct ClassInfo {
-		APIType api = API_NONE;
+	struct ClassInfo { //TODO: Pull this and related structs out into their own class
+		APIType api = API_NONE; //XXX: Now part of ClassMetadata
 		ClassInfo *inherits_ptr = nullptr;
-		void *class_ptr = nullptr;
+		void *class_ptr = nullptr; //XXX: Now part of ClassMetadata
 
 		ObjectGDExtension *gdextension = nullptr;
 
@@ -127,8 +127,27 @@ public:
 #endif
 		HashMap<StringName, PropertySetGet> property_setget;
 
-		StringName inherits;
-		StringName name;
+		struct Metadata { //XXX: depreciated, see ClassMetadata
+			protected:
+				StringName class_name; //The class name
+				StringName class_namespace; //The Namespace the class is in
+			public:
+				_FORCE_INLINE_ void set_class_name(const StringName &p_class_name) { class_name = p_class_name; }
+				_FORCE_INLINE_ void set_class_namespace(const StringName &p_class_namespace) { class_namespace = p_class_namespace; }
+				_FORCE_INLINE_ void set(const StringName &p_class_name, const StringName &p_class_namespace = StringName("")) {
+					class_name = p_class_name;
+					class_namespace = p_class_namespace;
+				};
+
+				_FORCE_INLINE_ const StringName &get_class_name() const { return class_name; }
+				_FORCE_INLINE_ const StringName &get_class_namespace() const { return class_namespace; }
+		};
+
+		Metadata metadata; //This classes metadata
+		Metadata inherited_metadata; //The inherited classes metadata (if any)
+
+		//StringName inherits; //XXX: depreciated, see ClassMetadata
+		//StringName name;     //XXX: depreciated, see ClassMetadata
 		bool disabled = false;
 		bool exposed = false;
 		bool reloadable = false;
@@ -136,8 +155,8 @@ public:
 		bool is_runtime = false;
 		Object *(*creation_func)() = nullptr;
 
-		ClassInfo() {}
-		~ClassInfo() {}
+		ClassInfo() = default;
+		~ClassInfo() = default;
 	};
 
 	template <typename T>

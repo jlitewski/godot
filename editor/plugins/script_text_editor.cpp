@@ -1241,12 +1241,12 @@ void ScriptTextEditor::_update_connected_methods() {
 				if (base_class_ptr == nullptr) {
 					break;
 				}
-				base_class = base_class_ptr->name;
+				base_class = base_class_ptr->metadata.get_class_name();
 			}
 		}
 
 		if (!found_base_class.is_empty()) {
-			int line = functions[i].get_slice(":", 1).to_int() - 1;
+			const int line = functions[i].get_slice(":", 1).to_int() - 1;
 
 			Dictionary line_meta = text_edit->get_line_gutter_metadata(line, connection_gutter);
 			if (line_meta.is_empty()) {
