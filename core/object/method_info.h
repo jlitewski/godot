@@ -4,6 +4,7 @@
 #include "core/extension/gdextension_interface.h"
 #include "core/templates/list.h"
 #include "core/templates/vector.h"
+#include "core/templates/bit_flag.h"
 #include "core/typedefs.h"
 #include "core/class/class_metadata.h"
 #include "core/string/ustring.h"
@@ -14,71 +15,6 @@
 #include <cstdint>
 
 class HMethodInfo { //TODO: Rename to MethodInfo after fully refactoring everything into this class
-    private:
-        String name; //Name of the method
-        const ClassMetadata& metadata; //Metadata of the class this method is a part of
-        List<PropertyInfo> args; //List of arguments this method takes
-        Vector<Variant> default_args; //List of default arguments
-        Vector<uint32_t> args_metadata;
-        PropertyInfo return_value; //The return value
-        uint8_t flags = METHOD_FLAGS_DEFAULT; //The bitfield of method flags (See MethodInfo::MethodFlags)
-        uint32_t id = 0;
-
-#ifdef DEBUG_METHODS_ENABLED //Debug related variables goes here
-        Vector<String> arg_names; //List of argument names (for debugging)
-#endif
-
-        _FORCE_INLINE_ void set_return_type(const Variant::Type p_return_type) {
-            this->return_value.type = p_return_type;
-            this->set_flags(METHOD_FLAG_RETURNS);
-        }
-
-        _FORCE_INLINE_ void set_return_value(const PropertyInfo& p_return_value) {
-            this->return_value = p_return_value;
-            this->set_flags(METHOD_FLAG_RETURNS);
-        }
-
-        _FORCE_INLINE_ void clear_all_flags() { this->flags = METHOD_FLAGS_DEFAULT; }
-
-        _FORCE_INLINE_ void _push_params(const PropertyInfo &p_param) {
-            args.push_back(p_param);
-        }
-
-        template <typename... VarArgs>
-        _FORCE_INLINE_ void _push_params(const PropertyInfo &p_param, VarArgs... p_params) {
-            args.push_back(p_param);
-            _push_params(p_params...);
-        }
-
-        template <typename... MethodFlags>
-        const void clear_flags(MethodFlags... p_flags) {
-            for(auto flag : {p_flags...}) {
-                if(this->has_flag(flag)) {
-                    this->flags &= ~flag; //Bitwise AND with inverted flag to clear
-                }
-            }
-        }
-
-        template <typename... MethodFlags>
-        const void set_flags(MethodFlags... p_flags) {
-            for(auto flag : {p_flags...}) {
-                if(!this->has_flag(flag)) {
-                    this->flags |= flag; //Bitwise OR to set
-                }
-            }
-        }
-
-    private: // ClassDB specific debug functions
-        friend class ClassDB;
-
-        _FORCE_INLINE_ void set_id(uint32_t p_id) { this->id = p_id; }
-
-#ifdef DEBUG_METHODS_ENABLED
-        void set_argument_names(const Vector<String> &p_names) {
-            this->arg_names = p_names;
-        }
-#endif
-
     public:
         //Enum of possible method flags, used as a bitfield
         enum MethodFlags : uint8_t {
@@ -93,15 +29,59 @@ class HMethodInfo { //TODO: Rename to MethodInfo after fully refactoring everyth
 	        METHOD_FLAGS_DEFAULT = METHOD_FLAG_NORMAL,
         };
 
-        _FORCE_INLINE_ const String& get_name() const { return this->name; }
-        _FORCE_INLINE_ const PropertyInfo& get_return_value() const { return this->return_value; }
-        _FORCE_INLINE_ const uint8_t& get_flags() const { return this->flags; }
-        _FORCE_INLINE_ const uint32_t& get_id() const { return this->id; }
+    private:
+        String name; //Name of the method
+        const ClassMetadata& metadata; //Metadata of the class this method is a part of
+        List<PropertyInfo> args; //List of arguments this method takes
+        Vector<Variant> default_args; //List of default arguments
+        Vector<uint32_t> args_metadata;
+        PropertyInfo return_value; //The return value
+        HBitFlag<HMethodInfo::MethodFlags> flags = HBitFlag<HMethodInfo::MethodFlags>(METHOD_FLAGS_DEFAULT);
+        uint32_t id = 0;
 
+#ifdef DEBUG_METHODS_ENABLED //Debug related variables goes here
+        Vector<String> arg_names; //List of argument names (for debugging)
+#endif
+
+        _FORCE_INLINE_ void set_return_type(const Variant::Type p_return_type) {
+            this->return_value.type = p_return_type;
+            this->flags.set_flag(METHOD_FLAG_RETURNS);
+        }
+
+        _FORCE_INLINE_ void set_return_value(const PropertyInfo& p_return_value) {
+            this->return_value = p_return_value;
+            this->flags.set_flag(METHOD_FLAG_RETURNS);
+        }
+
+        _FORCE_INLINE_ void _push_params(const PropertyInfo &p_param) {
+            args.push_back(p_param);
+        }
+
+        template <typename... VarArgs>
+        _FORCE_INLINE_ void _push_params(const PropertyInfo &p_param, VarArgs... p_params) {
+            args.push_back(p_param);
+            _push_params(p_params...);
+        }
+
+    private: // ClassDB specific debug functions
+        friend class ClassDB;
+
+        _FORCE_INLINE_ void set_id(uint32_t p_id) { this->id = p_id; }
+
+#ifdef DEBUG_METHODS_ENABLED
+        void set_argument_names(const Vector<String> &p_names) {
+            this->arg_names = p_names;
+        }
+#endif
+
+    public:
+        _FORCE_INLINE_ const String& get_name() const { return this->name; }
+        _FORCE_INLINE_ const uint32_t& get_id() const { return this->id; }
+        _FORCE_INLINE_ const PropertyInfo& get_return_value() const { return this->return_value; }
         _FORCE_INLINE_ bool has_return_value() const { return this->return_value.type != Variant::NIL; }
 
-        const bool has_flag(MethodFlags p_flag) const {
-            return this->flags & p_flag;
+        _FORCE_INLINE_ const Vector<Variant>& get_default_arguments() const {
+            return this->default_args;
         }
 
         inline bool operator==(const HMethodInfo &p_method) const 
@@ -158,7 +138,8 @@ class HMethodInfo { //TODO: Rename to MethodInfo after fully refactoring everyth
 
         explicit HMethodInfo(const GDExtensionMethodInfo &pinfo, const ClassMetadata &p_class_metadata)
                 : metadata(p_class_metadata), name(*reinterpret_cast<String *>(pinfo.name)),
-                return_value(PropertyInfo(pinfo.return_value)), flags(pinfo.flags), id(pinfo.id) {
+                return_value(PropertyInfo(pinfo.return_value)), id(pinfo.id) {
+            //TODO: Refactor GDExtensionMethodInfo to use the new HBitFlag object
             
             //TODO: Refactor to take uint8_t instead of uint32_t. 8-bits should be more than enough 
             for(uint32_t index = 0; index < pinfo.argument_count; index++) {

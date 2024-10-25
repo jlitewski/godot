@@ -26,7 +26,7 @@ HMethodInfo::operator Dictionary() const {
     }
     dict["args_default"] = dict_array.duplicate(true);
 
-    dict["flags"] = this->flags;
+    dict["flags"] = this->flags.get_raw_data();
     dict["id"] = this->id;
 
     dict["return"] = Dictionary(this->return_value);
@@ -71,7 +71,8 @@ HMethodInfo HMethodInfo::from_dict(const Dictionary &p_dict) {
     }
 
     if (p_dict.has("flags")) {
-        method_info.flags = p_dict["flags"];
+        //XXX: This might not return the uint8_t we passed into it. Need to test it
+        method_info.flags.set_raw_data(p_dict["flags"]);
     }
 
     //FIXME: Not sure if this is needed, or if it was a bug that the original implementation doesn't have it
